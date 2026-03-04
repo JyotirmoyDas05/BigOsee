@@ -87,6 +87,13 @@ export default function EditorPanel() {
               horizontalScrollbarSize: 5,
             },
           }}
+          beforeMount={(monaco) => {
+            monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+              noSemanticValidation: true,
+              noSyntaxValidation: true,
+              noSuggestionDiagnostics: true,
+            });
+          }}
         />
       </div>
     </div>

@@ -12,7 +12,7 @@ const CATEGORY_DEFAULTS: Record<string, { time: { best: string; average: string;
     "Arrays & Hashing": { time: { best: "O(n)", average: "O(n)", worst: "O(n²)" }, space: "O(n)" },
     "Advanced Matrix": { time: { best: "O(n²)", average: "O(n²)", worst: "O(n²)" }, space: "O(1)" },
     "Binary Search Variants": { time: { best: "O(1)", average: "O(log n)", worst: "O(log n)" }, space: "O(1)" },
-    "Sorting Algorithms": { time: { best: "O(n)", average: "O(n²)", worst: "O(n²)" }, space: "O(1)" },
+    "Sorting Algorithms": { time: { best: "O(n log n)", average: "O(n²)", worst: "O(n²)" }, space: "O(1)" },
     "Recursion & Backtracking": { time: { best: "O(n)", average: "O(2ⁿ)", worst: "O(n!)" }, space: "O(n)" },
     "Stack Algorithms": { time: { best: "O(n)", average: "O(n)", worst: "O(n²)" }, space: "O(n)" },
     "Linked List": { time: { best: "O(n)", average: "O(n)", worst: "O(n)" }, space: "O(1)" },
@@ -82,6 +82,18 @@ interface ASTFeatures {
     hasPivot: boolean;
     hasHeapify: boolean;
     hasInsertionShift: boolean;
+    // extended detection fields
+    hasTwoPointers: boolean;
+    hasMemoCache: boolean;
+    hasHashMap: boolean;
+    hasQueue: boolean;
+    hasStack: boolean;
+    hasStringOps: boolean;
+    hasSlidingWindow: boolean;
+    hasDPTable: boolean;
+    hasGreedySort: boolean;
+    variableNames: Set<string>;
+    methodCalls: Set<string>;
 }
 
 function extractFeatures(code: string): ASTFeatures {
@@ -91,6 +103,10 @@ function extractFeatures(code: string): ASTFeatures {
         hasDivideAndConquer: false, hasCompareAndSwap: false, mainFnName: "", loopCount: 0,
         hasMidCalc: false, hasMinTracker: false, hasMerge: false, hasPartition: false,
         hasPivot: false, hasHeapify: false, hasInsertionShift: false,
+        // extended
+        hasTwoPointers: false, hasMemoCache: false, hasHashMap: false, hasQueue: false,
+        hasStack: false, hasStringOps: false, hasSlidingWindow: false, hasDPTable: false,
+        hasGreedySort: false, variableNames: new Set(), methodCalls: new Set(),
     };
     let currentLoopDepth = 0;
     const functionNames = new Set<string>();
@@ -103,6 +119,10 @@ function extractFeatures(code: string): ASTFeatures {
                 functionNames.add(node.id.name);
                 if (!features.mainFnName) features.mainFnName = node.id.name;
             }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        VariableDeclarator(node: any) {
+            if (node.id?.name) features.variableNames.add(node.id.name);
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ForStatement(node: any, ancestors: any[]) {
@@ -129,6 +149,10 @@ function extractFeatures(code: string): ASTFeatures {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         CallExpression(node: any) {
             if (node.callee.type === "Identifier" && functionNames.has(node.callee.name)) features.hasRecursion = true;
+            // Track method calls for pattern detection
+            if (node.callee.type === "MemberExpression" && node.callee.property?.name) {
+                features.methodCalls.add(node.callee.property.name);
+            }
         },
     });
 
@@ -143,10 +167,73 @@ function extractFeatures(code: string): ASTFeatures {
     features.hasInsertionShift = /while\s*\(.*j.*>=?\s*0/.test(code) && features.hasSwap;
     features.hasCompareAndSwap = features.hasSwap && features.hasNestedLoops;
     features.hasDivideAndConquer = features.hasRecursion && features.hasMidCalc;
+
+    // Derived extended features
+    const varArr = [...features.variableNames];
+
+    // Two-pointer: named pointer pairs coexist
+    features.hasTwoPointers =
+        (varArr.includes("left") && varArr.includes("right")) ||
+        (varArr.includes("slow") && varArr.includes("fast")) ||
+        (varArr.includes("l") && varArr.includes("r"));
+
+    // HashMap: new Map() or frequency-counter pattern
+    features.hasHashMap =
+        lowerCode.includes("new map") ||
+        /(\w+)\s*\[\s*\w+\s*\]\s*(\+\+|=\s*\()/.test(code) ||
+        lowerCode.includes("freq[") || lowerCode.includes("count[");
+
+    // Queue: uses .shift() for dequeue
+    features.hasQueue = features.methodCalls.has("shift");
+
+    // Stack: uses push AND pop
+    features.hasStack = features.methodCalls.has("push") && features.methodCalls.has("pop");
+
+    // String ops: character-level processing
+    features.hasStringOps =
+        features.methodCalls.has("charCodeAt") ||
+        features.methodCalls.has("charAt") ||
+        features.methodCalls.has("substring") ||
+        (features.methodCalls.has("split") && !features.hasNestedLoops);
+
+    // Memo cache: recursive + cache/memo/Map
+    features.hasMemoCache = features.hasRecursion && (
+        features.hasHashMap ||
+        lowerCode.includes("memo") ||
+        lowerCode.includes("cache") ||
+        lowerCode.includes("dp[")
+    );
+
+    // Sliding window: window-like variable names or two-pointer + hashmap + single loop
+    features.hasSlidingWindow =
+        varArr.some(n => n.includes("window") || n === "maxLen" || n === "maxSize" || n === "windowSize") ||
+        (features.hasTwoPointers && !features.hasNestedLoops && features.hasHashMap);
+
+    // 2D DP table: dp[i][j] = …
+    features.hasDPTable = /dp\s*\[\s*\w+\s*\]\s*\[\s*\w+\s*\]/.test(code);
+
+    // Greedy: sort + loop, no recursion
+    features.hasGreedySort =
+        features.methodCalls.has("sort") &&
+        features.loopCount >= 1 &&
+        !features.hasRecursion;
+
     return features;
 }
 
 const ALGORITHMS: { match: (f: ASTFeatures) => boolean; info: AlgorithmInfo }[] = [
+    // ── Highly specific extended patterns first ─────────────────────────────
+    { match: (f) => f.hasDPTable, info: { name: "Dynamic Programming (2D Tabulation)", category: "Dynamic Programming", timeComplexity: { best: "O(n²)", average: "O(n²)", worst: "O(n²)" }, spaceComplexity: "O(n²)", description: "Bottom-up DP with a 2D dp[i][j] table." } },
+    { match: (f) => f.hasMemoCache, info: { name: "Dynamic Programming (Memoization)", category: "Dynamic Programming", timeComplexity: { best: "O(n)", average: "O(n²)", worst: "O(n²)" }, spaceComplexity: "O(n)", description: "Recursive solution with memoization to cache sub-problem results." } },
+    { match: (f) => f.hasQueue && !f.hasStack && !f.hasRecursion, info: { name: "Breadth-First Search (BFS)", category: "Graph Traversals", timeComplexity: { best: "O(V+E)", average: "O(V+E)", worst: "O(V+E)" }, spaceComplexity: "O(V)", description: "Level-by-level traversal using a queue (shift)." } },
+    { match: (f) => f.hasStack && f.hasRecursion, info: { name: "Depth-First Search (DFS)", category: "Graph Traversals", timeComplexity: { best: "O(V+E)", average: "O(V+E)", worst: "O(V+E)" }, spaceComplexity: "O(V)", description: "Deep traversal using recursive call stack or explicit stack." } },
+    { match: (f) => f.hasSlidingWindow, info: { name: "Sliding Window", category: "Arrays & Hashing", timeComplexity: { best: "O(n)", average: "O(n)", worst: "O(n)" }, spaceComplexity: "O(k)", description: "Maintains a dynamic window over the array, expanding and shrinking." } },
+    { match: (f) => f.hasTwoPointers && !f.hasNestedLoops && !f.hasSlidingWindow, info: { name: "Two Pointer Technique", category: "Arrays & Hashing", timeComplexity: { best: "O(n)", average: "O(n)", worst: "O(n)" }, spaceComplexity: "O(1)", description: "Two indices moving toward each other or in the same direction." } },
+    { match: (f) => f.hasHashMap && f.loopCount === 1 && !f.hasNestedLoops && !f.hasRecursion, info: { name: "Frequency Counter / Hash Map", category: "Arrays & Hashing", timeComplexity: { best: "O(n)", average: "O(n)", worst: "O(n)" }, spaceComplexity: "O(n)", description: "Counts element frequencies or stores lookups in a hash map." } },
+    { match: (f) => f.hasStringOps && !f.hasNestedLoops && !f.hasRecursion, info: { name: "Linear String Algorithm", category: "String Algorithms", timeComplexity: { best: "O(n)", average: "O(n)", worst: "O(n)" }, spaceComplexity: "O(n)", description: "Character-level string processing in a single pass." } },
+    { match: (f) => f.hasStringOps && f.hasNestedLoops, info: { name: "String Search Algorithm", category: "String Algorithms", timeComplexity: { best: "O(n)", average: "O(n·m)", worst: "O(n·m)" }, spaceComplexity: "O(1)", description: "Pattern matching with nested character comparisons." } },
+    { match: (f) => f.hasGreedySort, info: { name: "Greedy Algorithm", category: "Greedy Algorithms", timeComplexity: { best: "O(n log n)", average: "O(n log n)", worst: "O(n log n)" }, spaceComplexity: "O(1)", description: "Sorts input first then makes locally optimal choices at each step." } },
+    // ── Original sorting/searching patterns ─────────────────────────────────
     { match: (f) => f.hasHeapify, info: { name: "Heap Sort", category: "Sorting", timeComplexity: { best: "O(n log n)", average: "O(n log n)", worst: "O(n log n)" }, spaceComplexity: "O(1)", description: "Builds a max heap and repeatedly extracts the maximum element." } },
     { match: (f) => f.hasMerge && f.hasRecursion, info: { name: "Merge Sort", category: "Sorting", timeComplexity: { best: "O(n log n)", average: "O(n log n)", worst: "O(n log n)" }, spaceComplexity: "O(n)", description: "Divides array in half recursively, then merges sorted halves." } },
     { match: (f) => (f.hasPartition || f.hasPivot) && f.hasRecursion, info: { name: "Quick Sort", category: "Sorting", timeComplexity: { best: "O(n log n)", average: "O(n log n)", worst: "O(n²)" }, spaceComplexity: "O(log n)", description: "Selects a pivot, partitions elements around it, and recurses." } },

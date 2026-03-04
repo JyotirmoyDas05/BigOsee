@@ -13,6 +13,23 @@ import { useTimelineStore } from "@/stores/timelineStore";
 import { useCodeStore } from "@/stores/codeStore";
 import { executeCode } from "@/engine/interpreter";
 import { detectAlgorithm, detectByQuestionId } from "@/engine/detector";
+import {
+  transpileToJS,
+  detectLanguageWithScore,
+  LANGUAGE_LABELS,
+} from "@/engine/transpiler";
+import { executePython, prewarmPyodide } from "@/engine/pythonRuntime";
+import {
+  detectLanguageAccurate,
+  prewarmTreeSitter,
+} from "@/engine/languageParser";
+import {
+  isJudge0Available,
+  executeWithJudge0,
+  makeOutputSnapshot,
+} from "@/engine/judge0Client";
+import { instrumentCode } from "@/engine/astInstrumenter";
+import { parseSnapshots } from "@/engine/snapshotParser";
 
 export default function PlaybackControls() {
   const {
@@ -27,7 +44,21 @@ export default function PlaybackControls() {
     setCurrentStep,
     setSnapshots,
   } = useTimelineStore();
-  const { code, activeQuestionId, setDetectedAlgorithm } = useCodeStore();
+  const {
+    code,
+    activeQuestionId,
+    setDetectedAlgorithm,
+    runError,
+    setRunError,
+    detectedInputLanguage,
+    wasTranspiled,
+    setDetectedInputLanguage,
+    setWasTranspiled,
+    isExecuting,
+    setIsExecuting,
+    executionStatus,
+    setExecutionStatus,
+  } = useCodeStore();
 
   const totalSteps = snapshots.length;
   const progress = totalSteps > 1 ? (currentStep / (totalSteps - 1)) * 100 : 0;
@@ -36,19 +67,176 @@ export default function PlaybackControls() {
 
   const logs = useMemo(() => snapshot?.logs ?? [], [snapshot]);
 
-  const handleRun = useCallback(() => {
-    try {
-      const algo = activeQuestionId
-        ? detectByQuestionId(activeQuestionId) || detectAlgorithm(code)
-        : detectAlgorithm(code);
-      setDetectedAlgorithm(algo);
+  // ─── Pre-warm Pyodide + Tree-sitter on page mount (background, no UI) ───
+  useEffect(() => {
+    prewarmPyodide();
+    prewarmTreeSitter();
+  }, []);
 
-      const snaps = executeCode(code);
-      if (snaps.length > 0) setSnapshots(snaps);
-    } catch {
-      // parse/runtime error
+  // ─── Main execution handler ───────────────────────────────────
+  const handleRun = useCallback(async () => {
+    // Stop any in-flight playback BEFORE touching snapshots
+    if (isPlaying) togglePlay();
+
+    // Clear stale error banner
+    setRunError(null);
+    setIsExecuting(true);
+    setExecutionStatus("Preparing…");
+
+    // Yield to let React paint the loading state
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    try {
+      // ── Language detection: fast regex first, Tree-sitter fallback ──
+      const regexResult = detectLanguageWithScore(code);
+      let detectedLanguage = regexResult.language;
+
+      // If regex confidence is low (< 3 matches), consult Tree-sitter
+      // for a more accurate grammar-based detection
+      if (regexResult.score < 3) {
+        try {
+          setExecutionStatus("Detecting language…");
+          const tsResult = await detectLanguageAccurate(code);
+          if (tsResult.confidence > 0.7) {
+            detectedLanguage = tsResult.language;
+          }
+        } catch {
+          // Tree-sitter failed — stick with regex result
+        }
+      }
+
+      setDetectedInputLanguage(detectedLanguage);
+
+      let snaps: import("@/engine/types").Snapshot[];
+
+      if (detectedLanguage === "python") {
+        // ── Python path: real CPython via Pyodide ──
+        setWasTranspiled(false);
+
+        // Algorithm detection on the raw Python code (works with our detector)
+        const algo = activeQuestionId
+          ? detectByQuestionId(activeQuestionId) || detectAlgorithm(code)
+          : detectAlgorithm(code);
+        setDetectedAlgorithm(algo);
+
+        snaps = await executePython(code, (status) => {
+          setExecutionStatus(status);
+        });
+      } else {
+        // ── JS / C / C++ / Java / TS path ──
+        // Hybrid approach for C/C++/Java:
+        //   1. Regex transpile → acorn interpreter for step-by-step visualization
+        //   2. Judge0 (if configured) for correctness verification / fallback
+        setExecutionStatus("Running…");
+
+        const {
+          code: jsCode,
+          wasTranspiled: transpiled,
+        } = transpileToJS(code);
+        setWasTranspiled(transpiled);
+
+        // Use the transpiled JS code for detection and execution
+        const algo = activeQuestionId
+          ? detectByQuestionId(activeQuestionId) || detectAlgorithm(jsCode)
+          : detectAlgorithm(jsCode);
+        setDetectedAlgorithm(algo);
+
+        // Try the transpile → acorn path first (gives us step-by-step animation)
+        let transpileSucceeded = false;
+        try {
+          snaps = executeCode(jsCode);
+          transpileSucceeded = snaps.length > 0;
+        } catch {
+          snaps = []; // transpile/interpret failed — try Judge0 fallback
+        }
+
+        // For C/C++/Java: use AST-based instrumentation via Judge0
+        // when transpile fails, or as correctness check when it succeeds
+        const isNativeLanguage = ["c", "cpp", "java"].includes(detectedLanguage);
+        if (isNativeLanguage && isJudge0Available()) {
+          if (!transpileSucceeded) {
+            // Transpile failed → use AST instrumentation for rich animation
+            try {
+              setExecutionStatus("Analyzing code structure…");
+              const { instrumentedCode } = await instrumentCode(
+                code,
+                detectedLanguage as "java" | "c" | "cpp",
+              );
+
+              setExecutionStatus("Compiling natively via Judge0…");
+              const j0Result = await executeWithJudge0(
+                instrumentedCode,
+                detectedLanguage,
+              );
+
+              if (j0Result.stdout) {
+                snaps = parseSnapshots(j0Result.stdout);
+              }
+
+              // If AST instrumentation produced no snapshots, fall back to output-only
+              if (snaps.length === 0) {
+                snaps = [makeOutputSnapshot(j0Result, code)];
+              }
+            } catch {
+              // AST instrumentation failed — try raw Judge0 as last resort
+              try {
+                setExecutionStatus("Running via Judge0…");
+                const j0Result = await executeWithJudge0(code, detectedLanguage);
+                snaps = [makeOutputSnapshot(j0Result, code)];
+              } catch {
+                // Judge0 also failed — no results
+              }
+            }
+          } else {
+            // Transpile succeeded → run Judge0 for correctness check
+            try {
+              setExecutionStatus("Verifying via Judge0…");
+              const j0Result = await executeWithJudge0(code, detectedLanguage);
+              if (j0Result.stdout && snaps.length > 0) {
+                const lastSnap = snaps[snaps.length - 1];
+                const j0Logs = j0Result.stdout.split("\n").filter((l) => l.trim());
+                snaps[snaps.length - 1] = {
+                  ...lastSnap,
+                  logs: [...lastSnap.logs, "── Native output (Judge0) ──", ...j0Logs],
+                };
+              }
+            } catch {
+              // Judge0 failed — transpile results are still fine
+            }
+          }
+        }
+      }
+
+      // ALWAYS call setSnapshots — even with empty array — so stale data clears
+      setSnapshots(snaps);
+
+      if (snaps.length === 0) {
+        setRunError(
+          "No steps captured. Make sure your code calls the function with test data below the definition.",
+        );
+      }
+    } catch (e: unknown) {
+      // Surface parse/runtime errors to the user
+      const msg = e instanceof Error ? e.message : String(e);
+      setRunError(msg);
+      setSnapshots([]); // clear stale visualization
+    } finally {
+      setIsExecuting(false);
+      setExecutionStatus(null);
     }
-  }, [code, activeQuestionId, setDetectedAlgorithm, setSnapshots]);
+  }, [
+    code,
+    activeQuestionId,
+    isPlaying,
+    togglePlay,
+    setRunError,
+    setDetectedAlgorithm,
+    setSnapshots,
+    setDetectedInputLanguage,
+    setWasTranspiled,
+    setIsExecuting,
+    setExecutionStatus,
+  ]);
 
   // Auto-run + start playing when a question is selected
   const prevQuestionRef = useRef(activeQuestionId);
@@ -64,11 +252,12 @@ export default function PlaybackControls() {
           clearTimeout(autoPlayTimeoutRef.current);
         }
         autoPlayTimeoutRef.current = window.setTimeout(() => {
-          // only start playback if it's not already playing to avoid accidental pauses
-          if (!isPlaying) {
+          // Read LIVE state, not the stale closure value
+          const { isPlaying: liveIsPlaying } = useTimelineStore.getState();
+          if (!liveIsPlaying) {
             togglePlay();
           }
-        }, 200);
+        }, 250);
       }, 80);
       return () => {
         clearTimeout(t);
@@ -78,7 +267,7 @@ export default function PlaybackControls() {
         }
       };
     }
-  }, [activeQuestionId, handleRun, togglePlay, isPlaying]);
+  }, [activeQuestionId, handleRun, togglePlay]);
 
   // Auto-advance steps when playing
   useEffect(() => {
@@ -90,12 +279,58 @@ export default function PlaybackControls() {
 
   return (
     <div className="flex flex-col gap-3 shrink-0">
+      {/* Run button with loading spinner */}
       <button
         onClick={handleRun}
-        className="w-full py-2.5 text-sm font-semibold bg-accent text-black rounded-(--radius-panel) hover:bg-accent-hover active:scale-[0.98] transition-all"
+        disabled={isExecuting}
+        className="w-full py-2.5 text-sm font-semibold bg-accent text-black rounded-(--radius-panel) hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
       >
-        Run Simulation
+        {isExecuting ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="animate-spin w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full" />
+            {executionStatus || "Running…"}
+          </span>
+        ) : (
+          "Run Simulation"
+        )}
       </button>
+
+      {/* Native Python execution badge */}
+      {detectedInputLanguage === "python" && !wasTranspiled && snapshots.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-green/10 border border-green/30 rounded-(--radius-panel) text-[10px] font-mono text-green">
+          <span className="font-bold shrink-0">🐍 Python</span>
+          <span className="text-green/70">
+            executed natively via Pyodide (real CPython in browser)
+          </span>
+        </div>
+      )}
+
+      {/* Transpilation info badge (for C/C++/Java/TS) */}
+      {wasTranspiled && detectedInputLanguage && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue/10 border border-blue/30 rounded-(--radius-panel) text-[10px] font-mono text-blue">
+          <span className="font-bold shrink-0">
+            {LANGUAGE_LABELS[detectedInputLanguage]}
+          </span>
+          <span className="text-blue/70">
+            detected &amp; auto-converted to JavaScript for visualization
+          </span>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {runError && (
+        <div className="flex items-start gap-2 px-3 py-2 bg-red/10 border border-red/30 rounded-(--radius-panel) text-[11px] font-mono text-red">
+          <span className="shrink-0 font-bold mt-px">Error:</span>
+          <span className="break-all leading-snug flex-1">{runError}</span>
+          <button
+            onClick={() => setRunError(null)}
+            className="ml-auto shrink-0 text-red/60 hover:text-red transition-colors"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Step counter + playback */}
       <div className="flex items-center justify-between">
@@ -190,20 +425,36 @@ export default function PlaybackControls() {
           <div className="px-3 py-2 border-b border-accent/20 overflow-hidden relative">
             <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent rounded-l" />
             <AnimatePresence mode="wait">
-              <motion.p
+              <motion.div
                 key={snapshot.step}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.15 }}
-                className="text-[11px] font-mono text-accent pl-2"
+                className="flex items-start gap-2 pl-2"
               >
-                <span className="text-text-muted text-[10px]">
-                  L{snapshot.line}{" "}
+                <span className="text-[9px] font-mono text-dark bg-accent px-1.5 py-0.5 rounded font-bold shrink-0 mt-px">
+                  L{snapshot.line}
                 </span>
-                {snapshot.description}
-              </motion.p>
+                <p className="text-[11px] font-mono text-accent leading-snug">
+                  {snapshot.description}
+                </p>
+              </motion.div>
             </AnimatePresence>
+          </div>
+
+          {/* comparisons + swaps stats */}
+          <div className="flex items-center gap-3 px-3 py-1.5 border-b border-accent/10">
+            <span className="text-[9px] font-mono text-text-muted">
+              Comparisons:{" "}
+              <span className="text-accent font-semibold">
+                {snapshot.comparisons}
+              </span>
+            </span>
+            <span className="text-[9px] font-mono text-text-muted">
+              Swaps:{" "}
+              <span className="text-red font-semibold">{snapshot.swaps}</span>
+            </span>
           </div>
 
           {/* logs */}

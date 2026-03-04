@@ -98,7 +98,7 @@ export default function Header() {
           />
           {/* thumb */}
           <span
-            className="relative z-10 flex items-center justify-center w-[18px] h-[18px] rounded-full shadow transition-all duration-300"
+            className="relative z-10 flex items-center justify-center w-4.5 h-4.5 rounded-full shadow transition-all duration-300"
             style={{
               transform: isLight ? "translateX(22px)" : "translateX(0px)",
               backgroundColor: isLight ? "#d97706" : "#6366f1",

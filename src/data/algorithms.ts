@@ -86,7 +86,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "merge-intervals",
         name: "Merge Overlapping Intervals",
         difficulty: "M",
-        code: `function mergeIntervals(arr) {\n  // sort by start\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) {\n        let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t;\n      }\n    }\n  }\n  return arr;\n}\nmergeIntervals([6,1,8,3,15,2,10,7]);`,
+        code: `function mergeIntervals(arr) {\n  // arr = [s0,e0,s1,e1,...] interval pairs\n  let n = arr.length;\n  // Bubble sort pairs by start value\n  for (let i = 0; i < n - 2; i += 2) {\n    for (let j = 0; j < n - i - 2; j += 2) {\n      if (arr[j] > arr[j+2]) {\n        let ts = arr[j]; let te = arr[j+1];\n        arr[j] = arr[j+2]; arr[j+1] = arr[j+3];\n        arr[j+2] = ts; arr[j+3] = te;\n      }\n    }\n  }\n  let result = [arr[0], arr[1]];\n  for (let i = 2; i < n; i += 2) {\n    let last = result.length - 1;\n    if (arr[i] <= result[last]) {\n      if (arr[i+1] > result[last]) result[last] = arr[i+1];\n    } else {\n      result.push(arr[i]); result.push(arr[i+1]);\n    }\n  }\n  for (let i = 0; i < result.length; i++) arr[i] = result[i];\n  return arr;\n}\nmergeIntervals([1,3,2,6,8,10,15,18,6,8]);`,
       },
       {
         id: "longest-consecutive",
@@ -98,7 +98,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "four-sum",
         name: "4-Sum",
         difficulty: "H",
-        code: `function fourSum(arr, target) {\n  // sort first\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) {\n        let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t;\n      }\n    }\n  }\n  return arr;\n}\nfourSum([1,0,-1,0,-2,2], 0);`,
+        code: `function fourSum(arr, target) {\n  let n = arr.length;\n  for (let i = 0; i < n - 1; i++) {\n    for (let j = 0; j < n - i - 1; j++) {\n      if (arr[j] > arr[j+1]) { let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t; }\n    }\n  }\n  let count = 0;\n  for (let i = 0; i < n - 3; i++) {\n    for (let j = i + 1; j < n - 2; j++) {\n      let l = j + 1; let r = n - 1;\n      while (l < r) {\n        let sum = arr[i] + arr[j] + arr[l] + arr[r];\n        if (sum === target) { count++; l++; r--; }\n        else if (sum < target) l++;\n        else r--;\n      }\n    }\n  }\n  return count;\n}\nfourSum([1,0,-1,0,-2,2], 0);`,
       },
       {
         id: "rotate-matrix",
@@ -122,7 +122,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "majority-element-ii",
         name: "Majority Element II",
         difficulty: "M",
-        code: `function majorityElementII(arr) {\n  let c1 = 0; let c2 = 0;\n  let e1 = -1; let e2 = -1;\n  for (let i = 0; i < arr.length; i++) {\n    if (arr[i] === e1) c1++;\n    else if (arr[i] === e2) c2++;\n    else if (c1 === 0) { e1 = arr[i]; c1 = 1; }\n    else if (c2 === 0) { e2 = arr[i]; c2 = 1; }\n    else { c1--; c2--; }\n  }\n  return e1;\n}\nmajorityElementII([3,2,3,1,2,3,2]);`,
+        code: `function majorityElementII(arr) {\n  let c1 = 0; let c2 = 0;\n  let e1 = -1; let e2 = -1;\n  for (let i = 0; i < arr.length; i++) {\n    if (arr[i] === e1) c1++;\n    else if (arr[i] === e2) c2++;\n    else if (c1 === 0) { e1 = arr[i]; c1 = 1; }\n    else if (c2 === 0) { e2 = arr[i]; c2 = 1; }\n    else { c1--; c2--; }\n  }\n  let res = [];\n  let n = arr.length;\n  let cnt1 = 0; let cnt2 = 0;\n  for (let i = 0; i < n; i++) {\n    if (arr[i] === e1) cnt1++;\n    else if (arr[i] === e2) cnt2++;\n  }\n  if (cnt1 > Math.floor(n / 3)) res.push(e1);\n  if (cnt2 > Math.floor(n / 3)) res.push(e2);\n  return res;\n}\nmajorityElementII([3,2,3,1,2,3,2]);`,
       },
       {
         id: "repeat-missing",
@@ -158,7 +158,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "rotate-matrix-90",
         name: "Rotate Matrix 90°",
         difficulty: "M",
-        code: `function rotate90(arr) {\n  let n = arr.length;\n  // reverse the array\n  let l = 0; let r = n - 1;\n  while (l < r) {\n    let t = arr[l]; arr[l] = arr[r]; arr[r] = t;\n    l++; r--;\n  }\n  return arr;\n}\nrotate90([1,2,3,4,5,6,7,8,9]);`,
+        code: `function rotate90(arr) {\n  let n = Math.round(Math.sqrt(arr.length));\n  // Step 1: Transpose (swap arr[i*n+j] with arr[j*n+i])\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      let t = arr[i*n+j]; arr[i*n+j] = arr[j*n+i]; arr[j*n+i] = t;\n    }\n  }\n  // Step 2: Reverse each row\n  for (let i = 0; i < n; i++) {\n    let l = i * n; let r = i * n + n - 1;\n    while (l < r) { let t = arr[l]; arr[l] = arr[r]; arr[r] = t; l++; r--; }\n  }\n  return arr;\n}\nrotate90([1,2,3,4,5,6,7,8,9]);`,
       },
       {
         id: "inversion-count",
@@ -187,7 +187,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "set-matrix-zeroes",
         name: "Set Matrix Zeroes",
         difficulty: "M",
-        code: `function setZeroes(arr) {\n  // simulate on flat array\n  let n = arr.length;\n  for (let i = 0; i < n; i++) {\n    if (arr[i] === 0) {\n      for (let j = 0; j < n; j++) {\n        if (arr[j] !== 0) arr[j] = -1;\n      }\n    }\n  }\n  for (let i = 0; i < n; i++) {\n    if (arr[i] === -1) arr[i] = 0;\n  }\n  return arr;\n}\nsetZeroes([1,2,0,4,5,6,7,0,9]);`,
+        code: `function setZeroes(arr) {\n  // Treats arr as 3x3 matrix (flat)\n  let n = 3;\n  let zeroRows = {};\n  let zeroCols = {};\n  for (let i = 0; i < n; i++) {\n    for (let j = 0; j < n; j++) {\n      if (arr[i*n+j] === 0) { zeroRows[i] = 1; zeroCols[j] = 1; }\n    }\n  }\n  for (let i = 0; i < n; i++) {\n    for (let j = 0; j < n; j++) {\n      if (zeroRows[i] || zeroCols[j]) arr[i*n+j] = 0;\n    }\n  }\n  return arr;\n}\nsetZeroes([1,2,0,4,5,6,7,0,9]);`,
       },
       {
         id: "search-2d-matrix",
@@ -299,7 +299,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "insertion-sort",
         name: "Insertion Sort",
         difficulty: "E",
-        code: `function insertionSort(arr) {\n  const n = arr.length;\n  for (let i = 1; i < n; i++) {\n    let j = i;\n    while (j > 0 && arr[j - 1] > arr[j]) {\n      let temp = arr[j];\n      arr[j] = arr[j - 1];\n      arr[j - 1] = temp;\n      j--;\n    }\n  }\n  return arr;\n}\ninsertionSort([12,11,13,5,6]);`,
+        code: `function insertionSort(arr) {\n  for (let i = 1; i < arr.length; i++) {\n    let key = arr[i];\n    let j = i - 1;\n    while (j >= 0 && arr[j] > key) {\n      arr[j + 1] = arr[j];\n      j--;\n    }\n    arr[j + 1] = key;\n  }\n  return arr;\n}\ninsertionSort([12,11,13,5,6]);`,
       },
       {
         id: "quick-sort",
@@ -340,7 +340,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "generate-subsets",
         name: "Generate Subsets",
         difficulty: "M",
-        code: `function subsets(arr) {\n  let n = arr.length;\n  let total = 1;\n  for (let i = 0; i < n; i++) total = total * 2;\n  let count = 0;\n  for (let i = 0; i < total; i++) {\n    count++;\n  }\n  return count;\n}\nsubsets([1,2,3,4]);`,
+        code: `function generateSubsets(arr) {\n  let n = arr.length;\n  let total = 1;\n  for (let i = 0; i < n; i++) total = total * 2;\n  let result = [];\n  for (let mask = 0; mask < total; mask++) {\n    let sum = 0;\n    for (let i = 0; i < n; i++) {\n      if ((mask >> i) & 1) sum = sum + arr[i];\n    }\n    result.push(sum);\n  }\n  return result;\n}\ngenerateSubsets([1,2,3,4]);`,
       },
       {
         id: "sum-array-recursive",
@@ -364,49 +364,49 @@ export const ALGORITHM_DATA: Category[] = [
         id: "combination-sum-ii",
         name: "Combination Sum II",
         difficulty: "M",
-        code: `function combinationSum2(arr, target) {\n  // sort first\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) { let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t; }\n    }\n  }\n  return arr;\n}\ncombinationSum2([10,1,2,7,6,1,5], 8);`,
+        code: `function combinationSum2(arr, target) {\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) { let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t; }\n    }\n  }\n  let count = 0;\n  let cur = [];\n  function bt(idx, rem) {\n    if (rem === 0) { count++; return; }\n    if (rem < 0 || idx >= arr.length) return;\n    for (let i = idx; i < arr.length; i++) {\n      if (i > idx && arr[i] === arr[i-1]) continue;\n      cur.push(arr[i]);\n      bt(i + 1, rem - arr[i]);\n      cur.pop();\n    }\n  }\n  bt(0, target);\n  return count;\n}\ncombinationSum2([10,1,2,7,6,1,5], 8);`,
       },
       {
         id: "palindrome-partition",
         name: "Palindrome Partitioning",
         difficulty: "H",
-        code: `function isPalindrome(arr, l, r) {\n  while (l < r) {\n    if (arr[l] !== arr[r]) return false;\n    l++; r--;\n  }\n  return true;\n}\nisPalindrome([1,2,3,2,1], 0, 4);`,
+        code: `function palindromePartition(arr) {\n  let count = 0;\n  function isPalin(l, r) {\n    while (l < r) { if (arr[l] !== arr[r]) return false; l++; r--; }\n    return true;\n  }\n  function bt(start) {\n    if (start >= arr.length) { count++; return; }\n    for (let end = start; end < arr.length; end++) {\n      if (isPalin(start, end)) bt(end + 1);\n    }\n  }\n  bt(0);\n  return count;\n}\npalindromePartition([1,2,1,1,2]);`,
       },
       {
         id: "n-queens",
         name: "N-Queens Problem",
         difficulty: "H",
-        code: `function nQueens(n) {\n  let board = [];\n  for (let i = 0; i < n; i++) board.push(0);\n  let solutions = 0;\n  // simplified count\n  for (let i = 0; i < n; i++) {\n    board[i] = i;\n  }\n  return n;\n}\nnQueens(8);`,
+        code: `function nQueens(n) {\n  let board = [];\n  for (let i = 0; i < n; i++) board.push(-1);\n  function isSafe(row, col) {\n    for (let r = 0; r < row; r++) {\n      if (board[r] === col) return false;\n      if (board[r] - col === r - row) return false;\n      if (board[r] - col === row - r) return false;\n    }\n    return true;\n  }\n  function solve(row) {\n    if (row === n) return 1;\n    let cnt = 0;\n    for (let col = 0; col < n; col++) {\n      if (isSafe(row, col)) {\n        board[row] = col;\n        cnt = cnt + solve(row + 1);\n        board[row] = -1;\n      }\n    }\n    return cnt;\n  }\n  return solve(0);\n}\nnQueens(4);`,
       },
       {
         id: "print-subsequences",
         name: "Print All Subsequences",
         difficulty: "E",
-        code: `function subsequences(arr) {\n  let n = arr.length;\n  let total = 1;\n  for (let i = 0; i < n; i++) total = total * 2;\n  return total;\n}\nsubsequences([1,2,3]);`,
+        code: `function printSubsequences(arr) {\n  let n = arr.length;\n  let total = 1;\n  for (let i = 0; i < n; i++) total = total * 2;\n  let sums = [];\n  for (let mask = 0; mask < total; mask++) {\n    let sum = 0;\n    for (let i = 0; i < n; i++) {\n      if ((mask >> i) & 1) sum = sum + arr[i];\n    }\n    sums.push(sum);\n  }\n  return sums;\n}\nprintSubsequences([1,2,3]);`,
       },
       {
         id: "print-permutations",
         name: "Print All Permutations",
         difficulty: "M",
-        code: `function permutationCount(arr) {\n  let n = arr.length;\n  let result = 1;\n  for (let i = 1; i <= n; i++) result = result * i;\n  return result;\n}\npermutationCount([1,2,3]);`,
+        code: `function generatePermutations(arr) {\n  let result = [];\n  function permute(a, start) {\n    if (start === a.length) {\n      let s = 0;\n      for (let i = 0; i < a.length; i++) s = s + a[i] * (i + 1);\n      result.push(s);\n      return;\n    }\n    for (let i = start; i < a.length; i++) {\n      let t = a[start]; a[start] = a[i]; a[i] = t;\n      permute(a, start + 1);\n      let u = a[start]; a[start] = a[i]; a[i] = u;\n    }\n  }\n  let input = [];\n  for (let i = 0; i < arr.length; i++) input.push(arr[i]);\n  permute(input, 0);\n  return result;\n}\ngeneratePermutations([1,2,3]);`,
       },
       {
         id: "subsets-ii",
         name: "Subsets II (Dupes)",
         difficulty: "M",
-        code: `function subsetsWithDup(arr) {\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) { let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t; }\n    }\n  }\n  return arr;\n}\nsubsetsWithDup([1,2,2,3]);`,
+        code: `function subsetsWithDup(arr) {\n  for (let i = 0; i < arr.length - 1; i++) {\n    for (let j = 0; j < arr.length - i - 1; j++) {\n      if (arr[j] > arr[j+1]) { let t = arr[j]; arr[j] = arr[j+1]; arr[j+1] = t; }\n    }\n  }\n  let count = 0;\n  function bt(idx) {\n    count++;\n    for (let i = idx; i < arr.length; i++) {\n      if (i > idx && arr[i] === arr[i-1]) continue;\n      bt(i + 1);\n    }\n  }\n  bt(0);\n  return count;\n}\nsubsetsWithDup([1,2,2,3]);`,
       },
       {
         id: "sudoku-solver",
         name: "Sudoku Solver",
         difficulty: "H",
-        code: `function sudokuSolver(arr) {\n  // validate a row\n  let valid = true;\n  for (let i = 0; i < arr.length; i++) {\n    for (let j = i + 1; j < arr.length; j++) {\n      if (arr[i] === arr[j] && arr[i] !== 0) valid = false;\n    }\n  }\n  return valid;\n}\nsudokuSolver([5,3,0,0,7,0,0,0,0]);`,
+        code: `function sudokuSolver(arr) {\n  let freq = {};\n  let valid = true;\n  let empty = 0;\n  for (let i = 0; i < arr.length; i++) {\n    if (arr[i] === 0) { empty++; continue; }\n    if (freq[arr[i]]) { valid = false; break; }\n    freq[arr[i]] = 1;\n  }\n  return valid ? empty : -1;\n}\nsudokuSolver([5,3,0,0,7,0,0,0,0]);`,
       },
       {
         id: "word-search",
         name: "Word Search",
         difficulty: "M",
-        code: `function wordSearch(arr, target) {\n  for (let i = 0; i < arr.length; i++) {\n    if (arr[i] === target) return i;\n  }\n  return -1;\n}\nwordSearch([65,66,67,68,69], 67);`,
+        code: `function wordSearch(arr, rows, cols) {\n  let pattern = [1, 2, 1];\n  let found = -1;\n  function dfs(pos, idx) {\n    if (idx === pattern.length) return true;\n    if (pos < 0 || pos >= arr.length) return false;\n    if (arr[pos] !== pattern[idx]) return false;\n    let temp = arr[pos];\n    arr[pos] = -1;\n    let r = Math.floor(pos / cols);\n    let c = pos % cols;\n    let ok = false;\n    if (!ok && r + 1 < rows) ok = dfs((r+1)*cols+c, idx+1);\n    if (!ok && c + 1 < cols) ok = dfs(r*cols+c+1, idx+1);\n    arr[pos] = temp;\n    return ok;\n  }\n  for (let i = 0; i < arr.length && found < 0; i++) {\n    if (dfs(i, 0)) found = i;\n  }\n  return found;\n}\nwordSearch([3,1,2,1,4,2,7,1,2], 3, 3);`,
       },
     ],
   },
@@ -453,7 +453,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "next-smaller",
         name: "Next Smaller Element",
         difficulty: "E",
-        code: `function nextSmaller(arr) {\n  let result = [];\n  for (let i = 0; i < arr.length; i++) {\n    let found = -1;\n    for (let j = i + 1; j < arr.length; j++) {\n      if (arr[j] < arr[i]) { found = arr[j]; break; }\n    }\n  }\n  return result;\n}\nnextSmaller([4,8,5,2,25]);`,
+        code: `function nextSmaller(arr) {\n  let result = [];\n  for (let i = 0; i < arr.length; i++) {\n    let found = -1;\n    for (let j = i + 1; j < arr.length; j++) {\n      if (arr[j] < arr[i]) { found = arr[j]; break; }\n    }\n    result.push(found);\n  }\n  return result;\n}\nnextSmaller([4,8,5,2,25]);`,
       },
       {
         id: "sort-stack",
@@ -477,13 +477,13 @@ export const ALGORITHM_DATA: Category[] = [
         id: "rotten-oranges",
         name: "Rotten Oranges (BFS)",
         difficulty: "M",
-        code: `function rottenOranges(arr) {\n  let time = 0;\n  let fresh = 0;\n  for (let i = 0; i < arr.length; i++) if (arr[i] === 1) fresh++;\n  while (fresh > 0 && time < arr.length) {\n    fresh--; time++;\n  }\n  return time;\n}\nrottenOranges([2,1,1,0,1,1]);`,
+        code: `function rottenOranges(arr) {\n  let time = 0;\n  let fresh = 0;\n  for (let i = 0; i < arr.length; i++) if (arr[i] === 1) fresh++;\n  while (fresh > 0) {\n    let newRotten = [];\n    for (let i = 0; i < arr.length; i++) {\n      if (arr[i] === 2) {\n        if (i > 0 && arr[i-1] === 1) newRotten.push(i-1);\n        if (i < arr.length - 1 && arr[i+1] === 1) newRotten.push(i+1);\n      }\n    }\n    if (newRotten.length === 0) return -1;\n    for (let i = 0; i < newRotten.length; i++) {\n      if (arr[newRotten[i]] === 1) { arr[newRotten[i]] = 2; fresh--; }\n    }\n    time++;\n  }\n  return time;\n}\nrottenOranges([2,1,1,0,1,1,2]);`,
       },
       {
         id: "celebrity-problem",
         name: "Celebrity Problem",
         difficulty: "H",
-        code: `function findCelebrity(arr) {\n  let candidate = 0;\n  for (let i = 1; i < arr.length; i++) {\n    if (arr[candidate] < arr[i]) candidate = i;\n  }\n  return candidate;\n}\nfindCelebrity([0,1,0,1,1,0,0]);`,
+        code: `function findCelebrity(arr) {\n  // Celebrity: knows no one (arr[i]=0) but is known by all\n  let candidate = 0;\n  for (let i = 1; i < arr.length; i++) {\n    if (arr[candidate] !== 0) candidate = i;\n  }\n  if (arr[candidate] === 0) return candidate;\n  return -1;\n}\nfindCelebrity([3,2,0,1,2,0,1]);`,
       },
       {
         id: "max-min-windows",
@@ -500,85 +500,554 @@ export const ALGORITHM_DATA: Category[] = [
         id: "reverse-ll",
         name: "Reverse Linked List",
         difficulty: "E",
-        code: `function reverseList(arr) {\n  let l = 0; let r = arr.length - 1;\n  while (l < r) {\n    let t = arr[l]; arr[l] = arr[r]; arr[r] = t;\n    l++; r--;\n  }\n  return arr;\n}\nreverseList([1,2,3,4,5]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function reverseList(head) {
+    let prev = null;
+    let curr = head;
+    
+    while (curr !== null) {
+        const nextTemp = curr.next;
+        curr.next = prev;
+        prev = curr;
+        curr = nextTemp;
+    }
+    
+    return prev;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+reverseList(head);`,
       },
       {
         id: "detect-cycle",
         name: "Detect Cycle (Floyd's)",
         difficulty: "M",
-        code: `function hasCycle(arr) {\n  let slow = 0; let fast = 0;\n  while (fast < arr.length - 1) {\n    slow = slow + 1;\n    fast = fast + 2;\n    if (fast >= arr.length) return false;\n    if (arr[slow] === arr[fast]) return true;\n  }\n  return false;\n}\nhasCycle([3,2,0,4,2,0,4]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function hasCycle(head) {
+    if (!head || !head.next) return false;
+    
+    let slow = head;
+    let fast = head;
+    
+    while (fast && fast.next) {
+        slow = slow.next;
+        fast = fast.next.next;
+        
+        if (slow === fast) return true;
+    }
+    
+    return false;
+}
+
+let head = new ListNode(3);
+head.next = new ListNode(2);
+head.next.next = new ListNode(0);
+head.next.next.next = new ListNode(-4);
+head.next.next.next.next = head.next;
+hasCycle(head);`,
       },
       {
-        id: "reverse-array",
-        name: "Reverse Array",
-        difficulty: "E",
-        code: `function reverseArr(arr) {\n  let l = 0; let r = arr.length - 1;\n  while (l < r) {\n    let t = arr[l]; arr[l] = arr[r]; arr[r] = t;\n    l++; r--;\n  }\n  return arr;\n}\nreverseArr([1,2,3,4,5,6,7]);`,
-      },
-      {
-        id: "floyds-cycle",
-        name: "Floyd's Cycle Detection",
+        id: "swap-pairs",
+        name: "Swap Nodes in Pairs",
         difficulty: "M",
-        code: `function floydCycle(arr) {\n  let tortoise = arr[0];\n  let hare = arr[0];\n  tortoise = arr[tortoise];\n  hare = arr[arr[hare]];\n  while (tortoise !== hare) {\n    tortoise = arr[tortoise];\n    hare = arr[arr[hare]];\n  }\n  return tortoise;\n}\nfloydCycle([1,3,4,2,2]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function swapPairs(head) {
+    const dummy = new ListNode(0);
+    dummy.next = head;
+    let current = dummy;
+    
+    while (current.next && current.next.next) {
+        const first = current.next;
+        const second = current.next.next;
+        
+        first.next = second.next;
+        second.next = first;
+        current.next = second;
+        current = first;
+    }
+    
+    return dummy.next;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+head.next.next.next = new ListNode(4);
+swapPairs(head);`,
       },
       {
-        id: "merge-sorted-lists",
-        name: "Merge Sorted Lists",
+        id: "merge-two-lists",
+        name: "Merge Two Sorted Lists",
         difficulty: "E",
-        code: `function mergeLists(arr) {\n  let mid = Math.floor(arr.length / 2);\n  let l = 0; let r = mid; let result = [];\n  while (l < mid && r < arr.length) {\n    if (arr[l] <= arr[r]) { result.push(arr[l]); l++; }\n    else { result.push(arr[r]); r++; }\n  }\n  while (l < mid) { result.push(arr[l]); l++; }\n  while (r < arr.length) { result.push(arr[r]); r++; }\n  for (let i = 0; i < result.length; i++) arr[i] = result[i];\n  return arr;\n}\nmergeLists([1,3,5,7,2,4,6,8]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function mergeTwoLists(list1, list2) {
+    const dummy = new ListNode(0);
+    let current = dummy;
+    
+    while (list1 !== null && list2 !== null) {
+        if (list1.val <= list2.val) {
+            current.next = list1;
+            list1 = list1.next;
+        } else {
+            current.next = list2;
+            list2 = list2.next;
+        }
+        current = current.next;
+    }
+    
+    current.next = list1 !== null ? list1 : list2;
+    return dummy.next;
+}
+
+let list1 = new ListNode(1);
+list1.next = new ListNode(2);
+list1.next.next = new ListNode(4);
+
+let list2 = new ListNode(1);
+list2.next = new ListNode(3);
+list2.next.next = new ListNode(4);
+
+mergeTwoLists(list1, list2);`,
       },
       {
         id: "find-middle",
         name: "Find Middle Element",
         difficulty: "E",
-        code: `function findMiddle(arr) {\n  let slow = 0; let fast = 0;\n  while (fast < arr.length - 1 && fast + 1 < arr.length) {\n    slow++; fast = fast + 2;\n  }\n  return arr[slow];\n}\nfindMiddle([1,2,3,4,5,6,7]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function findMiddle(head) {
+    if (!head) return null;
+    
+    let slow = head;
+    let fast = head;
+    
+    while (fast && fast.next) {
+        slow = slow.next;
+        fast = fast.next.next;
+    }
+    
+    return slow;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+head.next.next.next = new ListNode(4);
+head.next.next.next.next = new ListNode(5);
+findMiddle(head);`,
       },
       {
         id: "remove-nth-end",
         name: "Remove N-th from End",
         difficulty: "M",
-        code: `function removeNth(arr, n) {\n  let idx = arr.length - n;\n  for (let i = idx; i < arr.length - 1; i++) arr[i] = arr[i+1];\n  arr.pop();\n  return arr;\n}\nremoveNth([1,2,3,4,5], 2);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function removeNthFromEnd(head, n) {
+    const dummy = new ListNode(0);
+    dummy.next = head;
+    let first = dummy;
+    let second = dummy;
+    
+    for (let i = 0; i <= n; i++) {
+        if (first === null) return head;
+        first = first.next;
+    }
+    
+    while (first !== null) {
+        first = first.next;
+        second = second.next;
+    }
+    
+    second.next = second.next.next;
+    return dummy.next;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+head.next.next.next = new ListNode(4);
+head.next.next.next.next = new ListNode(5);
+removeNthFromEnd(head, 2);`,
       },
       {
         id: "cycle-start",
         name: "Cycle Start Point",
         difficulty: "M",
-        code: `function cycleStart(arr) {\n  let slow = arr[0]; let fast = arr[0];\n  slow = arr[slow]; fast = arr[arr[fast]];\n  while (slow !== fast) { slow = arr[slow]; fast = arr[arr[fast]]; }\n  fast = arr[0];\n  while (slow !== fast) { slow = arr[slow]; fast = arr[fast]; }\n  return slow;\n}\ncycleStart([1,3,4,2,2]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function detectCycleStart(head) {
+    if (!head || !head.next) return null;
+    
+    let slow = head;
+    let fast = head;
+    let hasCycle = false;
+    
+    while (fast && fast.next) {
+        slow = slow.next;
+        fast = fast.next.next;
+        
+        if (slow === fast) {
+            hasCycle = true;
+            break;
+        }
+    }
+    
+    if (!hasCycle) return null;
+    
+    slow = head;
+    while (slow !== fast) {
+        slow = slow.next;
+        fast = fast.next;
+    }
+    
+    return slow;
+}
+
+let head = new ListNode(3);
+head.next = new ListNode(2);
+head.next.next = new ListNode(0);
+head.next.next.next = new ListNode(-4);
+head.next.next.next.next = head.next;
+detectCycleStart(head);`,
       },
       {
         id: "ll-palindrome",
         name: "LinkedList Palindrome",
         difficulty: "M",
-        code: `function isPalindromeLL(arr) {\n  let n = arr.length;\n  for (let i = 0; i < Math.floor(n/2); i++) {\n    if (arr[i] !== arr[n-1-i]) return false;\n  }\n  return true;\n}\nisPalindromeLL([1,2,3,2,1]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function isPalindrome(head) {
+    if (!head || !head.next) return true;
+    
+    // Find middle
+    let slow = head;
+    let fast = head;
+    while (fast && fast.next) {
+        slow = slow.next;
+        fast = fast.next.next;
+    }
+    
+    // Reverse second half
+    let prev = null;
+    let curr = slow;
+    while (curr) {
+        const nextTemp = curr.next;
+        curr.next = prev;
+        prev = curr;
+        curr = nextTemp;
+    }
+    
+    // Compare
+    let left = head;
+    let right = prev;
+    while (right) {
+        if (left.val !== right.val) return false;
+        left = left.next;
+        right = right.next;
+    }
+    
+    return true;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(2);
+head.next.next.next = new ListNode(1);
+isPalindrome(head);`,
       },
       {
         id: "rotate-list",
         name: "Rotate List",
         difficulty: "M",
-        code: `function rotateList(arr, k) {\n  let n = arr.length;\n  k = k % n;\n  let result = [];\n  for (let i = n - k; i < n; i++) result.push(arr[i]);\n  for (let i = 0; i < n - k; i++) result.push(arr[i]);\n  for (let i = 0; i < n; i++) arr[i] = result[i];\n  return arr;\n}\nrotateList([1,2,3,4,5], 2);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function rotateRight(head, k) {
+    if (!head || !head.next || k === 0) return head;
+    
+    // Find length
+    let length = 1;
+    let tail = head;
+    while (tail.next) {
+        tail = tail.next;
+        length++;
+    }
+    
+    k = k % length;
+    if (k === 0) return head;
+    
+    // Find new tail
+    let curr = head;
+    for (let i = 0; i < length - k - 1; i++) {
+        curr = curr.next;
+    }
+    
+    const newHead = curr.next;
+    curr.next = null;
+    tail.next = head;
+    
+    return newHead;
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+head.next.next.next = new ListNode(4);
+head.next.next.next.next = new ListNode(5);
+rotateRight(head, 2);`,
       },
       {
         id: "intersection-lists",
         name: "Intersection of Two Lists",
         difficulty: "M",
-        code: `function intersection(arr) {\n  let set = {};\n  let mid = Math.floor(arr.length / 2);\n  for (let i = 0; i < mid; i++) set[arr[i]] = true;\n  for (let i = mid; i < arr.length; i++) {\n    if (set[arr[i]]) return arr[i];\n  }\n  return -1;\n}\nintersection([1,3,5,8,10,8,4,2]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function getIntersectionNode(headA, headB) {
+    if (!headA || !headB) return null;
+    
+    let pointerA = headA;
+    let pointerB = headB;
+    
+    while (pointerA !== pointerB) {
+        pointerA = pointerA === null ? headB : pointerA.next;
+        pointerB = pointerB === null ? headA : pointerB.next;
+    }
+    
+    return pointerA;
+}
+
+let headA = new ListNode(4);
+headA.next = new ListNode(1);
+headA.next.next = new ListNode(8);
+headA.next.next.next = new ListNode(4);
+headA.next.next.next.next = new ListNode(5);
+
+let headB = new ListNode(5);
+headB.next = new ListNode(6);
+headB.next.next = new ListNode(1);
+headB.next.next.next = headA.next.next.next;
+
+getIntersectionNode(headA, headB);`,
       },
       {
         id: "add-two-numbers-ll",
         name: "Add Two Numbers as LL",
         difficulty: "M",
-        code: `function addTwoNumbers(arr) {\n  let carry = 0;\n  let result = [];\n  let mid = Math.floor(arr.length / 2);\n  for (let i = 0; i < mid; i++) {\n    let sum = arr[i] + arr[mid + i] + carry;\n    result.push(sum % 10);\n    carry = Math.floor(sum / 10);\n  }\n  if (carry) result.push(carry);\n  return result;\n}\naddTwoNumbers([2,4,3,5,6,4]);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function addTwoNumbers(l1, l2) {
+    const dummy = new ListNode(0);
+    let current = dummy;
+    let carry = 0;
+    let p1 = l1;
+    let p2 = l2;
+    
+    while (p1 || p2 || carry) {
+        const val1 = p1 ? p1.val : 0;
+        const val2 = p2 ? p2.val : 0;
+        const sum = val1 + val2 + carry;
+        
+        carry = Math.floor(sum / 10);
+        current.next = new ListNode(sum % 10);
+        current = current.next;
+        
+        p1 = p1 ? p1.next : null;
+        p2 = p2 ? p2.next : null;
+    }
+    
+    return dummy.next;
+}
+
+let l1 = new ListNode(2);
+l1.next = new ListNode(4);
+l1.next.next = new ListNode(3);
+
+let l2 = new ListNode(5);
+l2.next = new ListNode(6);
+l2.next.next = new ListNode(4);
+
+addTwoNumbers(l1, l2);`,
       },
       {
         id: "delete-node-o1",
         name: "Delete Node O(1)",
         difficulty: "E",
-        code: `function deleteNode(arr, pos) {\n  for (let i = pos; i < arr.length - 1; i++) arr[i] = arr[i+1];\n  arr.pop();\n  return arr;\n}\ndeleteNode([4,5,1,9,2,6], 2);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function deleteNode(node) {
+    if (!node || !node.next) return;
+    
+    node.val = node.next.val;
+    node.next = node.next.next;
+}
+
+let head = new ListNode(4);
+head.next = new ListNode(5);
+head.next.next = new ListNode(1);
+head.next.next.next = new ListNode(9);
+
+const nodeToDelete = head.next;
+deleteNode(nodeToDelete);`,
       },
       {
         id: "reverse-k-group",
         name: "Reverse K-Group",
         difficulty: "H",
-        code: `function reverseKGroup(arr, k) {\n  for (let i = 0; i < arr.length; i += k) {\n    let l = i; let r = Math.min(i + k - 1, arr.length - 1);\n    while (l < r) {\n      let t = arr[l]; arr[l] = arr[r]; arr[r] = t;\n      l++; r--;\n    }\n  }\n  return arr;\n}\nreverseKGroup([1,2,3,4,5,6,7,8], 3);`,
+        code: `class ListNode {
+    constructor(val = 0, next = null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+function reverseKGroup(head, k) {
+    const dummy = new ListNode(0);
+    dummy.next = head;
+    let prevGroup = dummy;
+    
+    while (true) {
+        let kthNode = prevGroup;
+        for (let i = 0; i < k; i++) {
+            kthNode = kthNode.next;
+            if (!kthNode) return dummy.next;
+        }
+        
+        const groupNext = kthNode.next;
+        let prev = groupNext;
+        let curr = prevGroup.next;
+        
+        for (let i = 0; i < k; i++) {
+            const nextTemp = curr.next;
+            curr.next = prev;
+            prev = curr;
+            curr = nextTemp;
+        }
+        
+        const groupStart = prevGroup.next;
+        prevGroup.next = kthNode;
+        prevGroup = groupStart;
+    }
+}
+
+let head = new ListNode(1);
+head.next = new ListNode(2);
+head.next.next = new ListNode(3);
+head.next.next.next = new ListNode(4);
+head.next.next.next.next = new ListNode(5);
+reverseKGroup(head, 2);`,
+      },
+      {
+        id: "copy-with-random",
+        name: "Copy List with Random Pointer",
+        difficulty: "M",
+        code: `class Node {
+    constructor(val) {
+        this.val = val;
+        this.next = null;
+        this.random = null;
+    }
+}
+
+function copyRandomList(head) {
+    if (!head) return null;
+    
+    const map = new Map();
+    let curr = head;
+    
+    while (curr) {
+        map.set(curr, new Node(curr.val));
+        curr = curr.next;
+    }
+    
+    curr = head;
+    while (curr) {
+        const copy = map.get(curr);
+        copy.next = curr.next ? map.get(curr.next) : null;
+        copy.random = curr.random ? map.get(curr.random) : null;
+        curr = curr.next;
+    }
+    
+    return map.get(head);
+}
+
+let head = new Node(7);
+head.next = new Node(13);
+head.next.next = new Node(11);
+head.next.next.next = new Node(10);
+head.next.next.next.next = new Node(1);
+
+head.random = null;
+head.next.random = head;
+head.next.next.random = head.next.next.next.next;
+head.next.next.next.random = head.next.next.next.next;
+head.next.next.next.next.random = head;
+
+copyRandomList(head);`,
       },
     ],
   },
@@ -713,7 +1182,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "rotting-oranges-g",
         name: "Rotting Oranges",
         difficulty: "M",
-        code: `function rottingOranges(arr) {\n  let time = 0;\n  let fresh = 0;\n  for (let i = 0; i < arr.length; i++) if (arr[i] === 1) fresh++;\n  while (fresh > 0 && time < 10) { fresh--; time++; }\n  return fresh === 0 ? time : -1;\n}\nrottingOranges([2,1,1,1,1,0,1]);`,
+        code: `function rottingOranges(arr) {\n  let time = 0;\n  let fresh = 0;\n  for (let i = 0; i < arr.length; i++) if (arr[i] === 1) fresh++;\n  while (fresh > 0) {\n    let newRotten = [];\n    for (let i = 0; i < arr.length; i++) {\n      if (arr[i] === 2) {\n        if (i > 0 && arr[i-1] === 1) newRotten.push(i-1);\n        if (i < arr.length - 1 && arr[i+1] === 1) newRotten.push(i+1);\n      }\n    }\n    if (newRotten.length === 0) return -1;\n    for (let i = 0; i < newRotten.length; i++) {\n      if (arr[newRotten[i]] === 1) { arr[newRotten[i]] = 2; fresh--; }\n    }\n    time++;\n  }\n  return time;\n}\nrottingOranges([2,1,1,1,1,0,1]);`,
       },
       {
         id: "course-schedule",
@@ -725,19 +1194,19 @@ export const ALGORITHM_DATA: Category[] = [
         id: "dijkstra",
         name: "Dijkstra's Algorithm",
         difficulty: "M",
-        code: `function dijkstra(arr) {\n  let dist = [];\n  for (let i = 0; i < arr.length; i++) dist.push(999);\n  dist[0] = 0;\n  for (let i = 0; i < arr.length; i++) {\n    for (let j = 0; j < arr.length; j++) {\n      if (dist[i] + arr[j] < dist[j]) dist[j] = dist[i] + arr[j];\n    }\n  }\n  return dist;\n}\ndijkstra([0,4,8,0,0,2,0]);`,
+        code: `function dijkstra(arr) {\n  // arr[i] = edge weight from node i to i+1\n  let n = arr.length;\n  let dist = [];\n  let vis = [];\n  for (let i = 0; i < n; i++) { dist.push(9999); vis.push(0); }\n  dist[0] = 0;\n  for (let iter = 0; iter < n; iter++) {\n    let u = -1;\n    for (let i = 0; i < n; i++) {\n      if (!vis[i] && (u === -1 || dist[i] < dist[u])) u = i;\n    }\n    if (u === -1 || dist[u] === 9999) break;\n    vis[u] = 1;\n    if (u + 1 < n && dist[u] + arr[u] < dist[u+1]) dist[u+1] = dist[u] + arr[u];\n    if (u - 1 >= 0 && dist[u] + arr[u-1] < dist[u-1]) dist[u-1] = dist[u] + arr[u-1];\n  }\n  return dist;\n}\ndijkstra([0,4,8,3,2,5,0]);`,
       },
       {
         id: "bellman-ford",
         name: "Bellman-Ford Algorithm",
         difficulty: "M",
-        code: `function bellmanFord(arr) {\n  let dist = [];\n  for (let i = 0; i < arr.length; i++) dist.push(999);\n  dist[0] = 0;\n  for (let k = 0; k < arr.length - 1; k++) {\n    for (let i = 0; i < arr.length; i++) {\n      if (dist[i] !== 999 && i + 1 < arr.length) {\n        if (dist[i] + arr[i] < dist[i+1]) dist[i+1] = dist[i] + arr[i];\n      }\n    }\n  }\n  return dist;\n}\nbellmanFord([0,6,5,8,2,3,7]);`,
+        code: `function bellmanFord(arr) {\n  // arr[i] = edge weight from i to i+1\n  let n = arr.length;\n  let dist = [];\n  for (let i = 0; i < n; i++) dist.push(9999);\n  dist[0] = 0;\n  for (let k = 0; k < n - 1; k++) {\n    for (let i = 0; i < n - 1; i++) {\n      if (dist[i] !== 9999 && dist[i] + arr[i] < dist[i+1]) dist[i+1] = dist[i] + arr[i];\n      if (dist[i+1] !== 9999 && dist[i+1] + arr[i] < dist[i]) dist[i] = dist[i+1] + arr[i];\n    }\n  }\n  return dist;\n}\nbellmanFord([0,6,5,8,2,3,7]);`,
       },
       {
         id: "floyd-warshall",
         name: "Floyd-Warshall Algorithm",
         difficulty: "M",
-        code: `function floydWarshall(arr) {\n  let n = arr.length;\n  for (let k = 0; k < n; k++) {\n    for (let i = 0; i < n; i++) {\n      if (arr[i] + arr[k] < arr[i]) arr[i] = arr[i] + arr[k];\n    }\n  }\n  return arr;\n}\nfloydWarshall([0,3,8,2,99,1,99]);`,
+        code: `function floydWarshall(arr) {\n  // arr = flat n*n matrix (n=4), 9999 = no edge\n  let n = 4;\n  let dist = [];\n  for (let i = 0; i < n * n; i++) dist.push(arr[i]);\n  for (let k = 0; k < n; k++) {\n    for (let i = 0; i < n; i++) {\n      for (let j = 0; j < n; j++) {\n        let via = dist[i*n+k] + dist[k*n+j];\n        if (via < dist[i*n+j]) dist[i*n+j] = via;\n      }\n    }\n  }\n  return dist;\n}\nfloydWarshall([0,3,9999,7,8,0,2,9999,9999,9999,0,1,9999,4,9999,0]);`,
       },
       {
         id: "cycle-detect-dfs",
@@ -749,7 +1218,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "bipartite",
         name: "Bipartite Check",
         difficulty: "M",
-        code: `function isBipartite(arr) {\n  let color = [];\n  for (let i = 0; i < arr.length; i++) color.push(-1);\n  color[0] = 0;\n  for (let i = 0; i < arr.length; i++) {\n    color[i] = i % 2;\n  }\n  return true;\n}\nisBipartite([1,2,3,4,5,6]);`,
+        code: `function isBipartite(arr) {\n  let color = [];\n  for (let i = 0; i < arr.length; i++) color.push(-1);\n  let result = true;\n  for (let s = 0; s < arr.length; s++) {\n    if (color[s] !== -1) continue;\n    color[s] = 0;\n    let queue = [s];\n    let qi = 0;\n    while (qi < queue.length) {\n      let node = queue[qi]; qi++;\n      let nbs = [];\n      if (node > 0) nbs.push(node - 1);\n      if (node < arr.length - 1) nbs.push(node + 1);\n      for (let j = 0; j < nbs.length; j++) {\n        let nb = nbs[j];\n        if (color[nb] === -1) { color[nb] = 1 - color[node]; queue.push(nb); }\n        else if (color[nb] === color[node]) result = false;\n      }\n    }\n  }\n  return result;\n}\nisBipartite([1,0,1,0,1,0]);`,
       },
     ],
   },
@@ -956,7 +1425,7 @@ export const ALGORITHM_DATA: Category[] = [
         id: "kmp",
         name: "KMP Algorithm",
         difficulty: "H",
-        code: `function kmpSearch(arr, pattern) {\n  let count = 0;\n  for (let i = 0; i <= arr.length - pattern; i++) {\n    let match = true;\n    for (let j = 0; j < pattern; j++) {\n      if (arr[i+j] !== arr[j]) { match = false; break; }\n    }\n    if (match) count++;\n  }\n  return count;\n}\nkmpSearch([1,2,1,2,1,3,1,2,1], 3);`,
+        code: `function kmpSearch(text, pat) {\n  let m = pat.length;\n  let lps = [];\n  for (let i = 0; i < m; i++) lps.push(0);\n  let len = 0; let i = 1;\n  while (i < m) {\n    if (pat[i] === pat[len]) { len++; lps[i] = len; i++; }\n    else if (len !== 0) len = lps[len - 1];\n    else { lps[i] = 0; i++; }\n  }\n  let count = 0;\n  let ti = 0; let pi = 0;\n  while (ti < text.length) {\n    if (text[ti] === pat[pi]) { ti++; pi++; }\n    if (pi === m) { count++; pi = lps[pi-1]; }\n    else if (ti < text.length && text[ti] !== pat[pi]) {\n      if (pi !== 0) pi = lps[pi-1]; else ti++;\n    }\n  }\n  return count;\n}\nkmpSearch([1,2,1,2,1,3,1,2,1], [1,2,1]);`,
       },
       {
         id: "roman-to-int",

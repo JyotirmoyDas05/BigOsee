@@ -16,6 +16,8 @@ import {
   DPCard,
   TreeCard,
   GraphCard,
+  LinkedListCard,
+  MatrixCard,
 } from "./ArrayVisualizer";
 import { IconResetLayout } from "./icons";
 
@@ -34,20 +36,22 @@ type VizType =
   | "hashmap"
   | "tree"
   | "graph"
-  | "dp";
+  | "dp"
+  | "linked-list"
+  | "matrix";
 
 const CATEGORY_PANELS: Record<string, VizType[]> = {
   "Arrays & Hashing": ["array"],
-  "Advanced Matrix": ["array"],
+  "Advanced Matrix": ["matrix", "array"],
   "Binary Search Variants": ["array"],
   "Sorting Algorithms": ["sorting", "array"],
   "Recursion & Backtracking": ["array"],
   "Stack Algorithms": ["stack", "array"],
-  "Linked List": ["array"],
+  "Linked List": ["linked-list"],
   "Tree Algorithms": ["tree", "array"],
   "Binary Search Tree": ["tree", "array"],
   "Graph Algorithms": ["graph", "array"],
-  "Dynamic Programming": ["dp"],
+  "Dynamic Programming": ["dp", "array"],
   "Greedy Algorithms": ["array"],
   "String Algorithms": ["array"],
   "Heap Algorithms": ["sorting", "tree"],
@@ -63,6 +67,8 @@ const VIZ_META: Record<VizType, { label: string; color: string }> = {
   tree: { label: "Tree", color: "text-teal" },
   graph: { label: "Graph", color: "text-orange" },
   dp: { label: "DP Table", color: "text-pink" },
+  "linked-list": { label: "Linked List", color: "text-teal" },
+  matrix: { label: "Matrix", color: "text-orange" },
 };
 
 // how many grid rows each viz type needs
@@ -74,6 +80,8 @@ const VIZ_ROWS: Record<VizType, number> = {
   tree: 3,
   graph: 3,
   dp: 2,
+  "linked-list": 3,
+  matrix: 3,
 };
 
 function DragHandle() {
@@ -237,12 +245,29 @@ export default function VisualizationGrid() {
         ) : null;
       case "graph":
         return arrays.length > 0 ? (
-          <GraphCard arrays={arrays} variables={variables} />
+          <GraphCard arrays={arrays} edges={snapshot?.edges} />
         ) : null;
       case "dp":
         return arrays.length > 0 ? (
           <DPCard arrays={arrays} variables={variables} />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full gap-1.5 px-6 text-center">
+            <span className="text-xs text-text-muted">No DP array detected yet.</span>
+            <span className="text-[10px] text-text-muted/60 leading-relaxed">
+              Declare an array named <code className="text-accent font-mono">dp</code> to see the table here.
+            </span>
+          </div>
+        );
+      case "linked-list":
+        return arrays.length > 0 || snapshot?.linkedList ? (
+          <LinkedListCard
+            arrays={arrays}
+            variables={snapshot?.variables}
+            linkedList={snapshot?.linkedList}
+          />
         ) : null;
+      case "matrix":
+        return arrays.length > 0 ? <MatrixCard arrays={arrays} variables={variables} /> : null;
       case "array":
       default:
         return arrays.length > 0 ? (
@@ -267,6 +292,7 @@ export default function VisualizationGrid() {
         <ReactGridLayout
           className="layout"
           layout={customLayout || layout}
+          onLayoutChange={(newLayout) => setCustomLayout([...newLayout])}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {...({ cols: 12 } as any)}
           rowHeight={rowH}

@@ -28,7 +28,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     totalSwaps: 0,
 
     setSnapshots: (snapshots) =>
-        set({ snapshots, currentStep: 0, isPlaying: false }),
+        set({ snapshots, currentStep: 0, isPlaying: false, totalComparisons: 0, totalSwaps: 0 }),
 
     setCurrentStep: (step) => {
         const { snapshots } = get();
