@@ -8,16 +8,12 @@
  * 1. Regex transpiler → acorn interpreter for step-by-step visualization
  * 2. Judge0 for correctness verification and fallback when transpile fails
  *
- * Set NEXT_PUBLIC_JUDGE0_URL in .env.local to your Judge0 endpoint.
- * If not set, Judge0 features are silently disabled.
+ * Calls Judge0 through the /api/execute proxy (Next.js backend).
+ * This avoids CORS issues and hides the Judge0 server IP from the browser.
+ * If Judge0 is not configured server-side, features are silently disabled.
  */
 
 import type { Snapshot } from "./types";
-
-const JUDGE0_URL =
-  typeof process !== "undefined"
-    ? (process.env.NEXT_PUBLIC_JUDGE0_URL ?? "")
-    : "";
 
 // Judge0 language IDs
 // See: https://ce.judge0.com/languages
@@ -41,91 +37,69 @@ export interface Judge0Result {
 
 /**
  * Returns true if a Judge0 endpoint is configured.
+ * Always returns true on client side (availability is checked when calling the API).
  */
 export function isJudge0Available(): boolean {
-  return JUDGE0_URL.length > 0;
+  return true; // API proxy will check server-side configuration
 }
 
 /**
- * Submit code to Judge0 and wait for the result.
+ * Submit code to Judge0 for execution via the /api/execute proxy.
  * Returns stdout, stderr, and execution status.
  *
  * @throws Error if the language is not supported, the request fails,
- *         or execution times out (15s max).
+ *         or execution times out.
  */
 export async function executeWithJudge0(
   code: string,
   language: string,
 ): Promise<Judge0Result> {
-  if (!JUDGE0_URL) {
-    throw new Error("Judge0 is not configured. Set NEXT_PUBLIC_JUDGE0_URL in .env.local");
-  }
-
   const langId = LANGUAGE_IDS[language];
   if (!langId) {
     throw new Error(`Language "${language}" is not supported by Judge0. Supported: ${Object.keys(LANGUAGE_IDS).join(", ")}`);
   }
 
-  // Submit the code
-  const submitRes = await fetch(
-    `${JUDGE0_URL}/submissions/?base64_encoded=true&wait=false`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source_code: btoa(unescape(encodeURIComponent(code))),
-        language_id: langId,
-        cpu_time_limit: 5,
-        memory_limit: 128000, // 128 MB
-      }),
-    },
-  );
+  const payload = {
+    source_code: btoa(unescape(encodeURIComponent(code))),
+    language_id: langId,
+    cpu_time_limit: 5,
+    memory_limit: 128000, // 128 MB
+  };
 
-  if (!submitRes.ok) {
-    const text = await submitRes.text();
-    throw new Error(`Judge0 submission failed (${submitRes.status}): ${text}`);
-  }
+  // Call the Next.js API proxy (which forwards to Judge0 with wait=true)
+  const res = await fetch("/api/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-  const { token } = await submitRes.json();
-  if (!token) {
-    throw new Error("Judge0 returned no submission token");
-  }
-
-  // Poll for result (max 15 seconds)
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-
-    const resultRes = await fetch(
-      `${JUDGE0_URL}/submissions/${token}?base64_encoded=true`,
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(
+      error.error || `Judge0 API returned status ${res.status}`
     );
-
-    if (!resultRes.ok) continue;
-
-    const result = await resultRes.json();
-
-    // Status IDs: 1 = In Queue, 2 = Processing, 3+ = finished
-    if (result.status?.id > 2) {
-      const decode = (b64: string | null): string => {
-        if (!b64) return "";
-        try {
-          return decodeURIComponent(escape(atob(b64)));
-        } catch {
-          return atob(b64);
-        }
-      };
-
-      return {
-        stdout: decode(result.stdout),
-        stderr: decode(result.stderr),
-        status: result.status.description ?? "Unknown",
-        compileOutput: decode(result.compile_output),
-        time: result.time ?? "0",
-        memory: result.memory ?? 0,
-      };
-    }
   }
 
-  throw new Error("Judge0 execution timed out (15s). The code may be stuck in an infinite loop.");
+  const result = await res.json();
+
+  // Decode base64 results from Judge0
+  const decode = (b64: string | null): string => {
+    if (!b64) return "";
+    try {
+      return decodeURIComponent(escape(atob(b64)));
+    } catch {
+      return atob(b64);
+    }
+  };
+
+  return {
+    stdout: decode(result.stdout),
+    stderr: decode(result.stderr),
+    status: result.status?.description ?? "Unknown",
+    compileOutput: decode(result.compile_output),
+    time: result.time ?? "0",
+    memory: result.memory ?? 0,
+  };
 }
 
 /**
